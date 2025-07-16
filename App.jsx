@@ -4,6 +4,11 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import './global.css';
 import Homescreen from 'screens/Homescreen';
+import Portal from 'screens/Portal';
+import Admin from 'screens/Admin';
+import Inventory from 'screens/Inventory';
+import AddInventory from 'screens/AddInventory';
+import AssignOrders from 'screens/AssignOrders';
 
 const Stack = createNativeStackNavigator();
 
@@ -17,6 +22,11 @@ export default function App() {
         >
           <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Home">
             <Stack.Screen name="Home" component={Homescreen} />
+            <Stack.Screen name="Portal" component={Portal} />
+            <Stack.Screen name="Admin" component={Admin} />
+            <Stack.Screen name="Inventory" component={Inventory} />
+            <Stack.Screen name="AddInventory" component={AddInventory} />
+            <Stack.Screen name="AssignOrders" component={AssignOrders} />
           </Stack.Navigator>
 
           <StatusBar style="auto" />
