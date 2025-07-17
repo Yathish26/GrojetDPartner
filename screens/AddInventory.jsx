@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import { useNavigation } from '@react-navigation/native';
 
 export default function AddInventory() {
     const [itemName, setItemName] = useState('');
@@ -15,6 +16,19 @@ export default function AddInventory() {
             if (!token) {
                 await SecureStore.deleteItemAsync('admintoken');
                 navigation.replace('Portal');
+            }
+        };
+        verifyToken();
+    }, []);
+
+    const navigate = useNavigation();
+
+    useEffect(() => {
+        const verifyToken = async () => {
+            const token = await SecureStore.getItemAsync('admintoken');
+            if (!token) {
+                await SecureStore.deleteItemAsync('admintoken');
+                navigate.replace('Portal');
             }
         };
         verifyToken();
@@ -48,6 +62,7 @@ export default function AddInventory() {
 
             if (response.ok && data.success) {
                 Alert.alert('Success', 'Item added successfully!');
+                navigate.navigate('Inventory');
                 setItemName('');
                 setStockQuantity('');
                 setPrice('');

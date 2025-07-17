@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Switch, StyleSheet } from 'react-native';
 import { MapPin, ShoppingBag, Truck, Package, IndianRupee } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import * as SecureStore from 'expo-secure-store';
 
-const Homescreen = ({ navigation }) => {
+const Homescreen = () => {
   const [isOnline, setIsOnline] = useState(false);
+
+  const navigation = useNavigation();
 
   const toggleOnlineStatus = () => {
     setIsOnline(previousState => !previousState);
@@ -16,6 +20,13 @@ const Homescreen = ({ navigation }) => {
 
   const handleRejectOrder = () => {
     alert('Order Rejected.');
+  };
+
+
+  const handleLogout = () => {
+    SecureStore.deleteItemAsync('deliverytoken');
+    navigation.navigate('Portal');
+    console.log("Logged out");
   };
 
   const newOrder = {
@@ -32,7 +43,7 @@ const Homescreen = ({ navigation }) => {
           <Text className="text-white text-4xl font-extrabold mb-2">Rider!</Text>
           <Text className="text-indigo-200 text-lg">Your next delivery awaits.</Text>
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate('Portal')} className="bg-red-500 rounded-xl p-3 shadow-lg">
+        <TouchableOpacity onPress={handleLogout} className="bg-red-500 rounded-xl p-3 shadow-lg">
           <Text className="text-white text-lg">Logout</Text>
         </TouchableOpacity>
       </View>

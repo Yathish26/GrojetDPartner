@@ -12,7 +12,7 @@ import {
   StyleSheet,
   Image
 } from 'react-native';
-import { Package, Mail, Lock, XCircle, CheckCircle } from 'lucide-react-native'; // Removed User, ChevronLeft
+import { User, Mail, Lock, XCircle, CheckCircle, ChevronLeft } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 import NetInfo from '@react-native-community/netinfo';
 import { useNavigation } from '@react-navigation/native';
@@ -55,7 +55,6 @@ const CustomAlert = ({ visible, message, type, onClose }) => {
 };
 
 const InputField = ({ icon, placeholder, value, onChangeText, secureTextEntry, keyboardType, editable, color }) => {
-  const borderColor = color === 'primary' ? 'border-indigo-500' : 'border-green-500';
   const iconColor = color === 'primary' ? '#4F46E5' : '#059669';
 
   return (
@@ -76,8 +75,7 @@ const InputField = ({ icon, placeholder, value, onChangeText, secureTextEntry, k
   );
 };
 
-const Portal = () => {
-  // Removed loginType state as it's no longer needed for conditional rendering of forms
+const AdminPortal = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -105,20 +103,21 @@ const Portal = () => {
 
   const navigation = useNavigation();
 
-  const handleDeliveryLogin = async () => {
+  const handleAdminLogin = async () => {
     if (!email.trim() || !password.trim()) {
       showAlert('Please enter both email and password.', 'error');
       return;
     }
 
     if (!isConnected) {
-      showAlert('No internet connection. Please check your network.', 'error');
+      showAlert('Cannot connect to the internet. Please check your network.', 'error');
       return;
     }
 
     setLoading(true);
+
     try {
-      const response = await fetch('http://192.168.1.35:5000/delivery/login', {
+      const response = await fetch('http://192.168.1.35:5000/admin/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -128,25 +127,23 @@ const Portal = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Delivery login failed');
+        throw new Error(errorData.message || 'Admin login failed');
       }
 
       const data = await response.json();
-      await SecureStore.setItemAsync('deliverytoken', data.token);
+      await SecureStore.setItemAsync('admintoken', data.token);
       
-      showAlert('Delivery login successful!', 'success');
+      showAlert('Admin login successful!', 'success');
       setTimeout(() => {
-        hideAlert(); // Hide alert before navigating
-        navigation.navigate('Home');
+        hideAlert();
+        navigation.navigate('Admin');
       }, 1500);
     } catch (error) {
-      showAlert(error.message || 'Delivery login failed. Please try again.', 'error');
+      showAlert(error.message || 'Admin login failed. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
   };
-
-  // Removed handleAdminLogin function as it's no longer handled here
 
   return (
     <KeyboardAvoidingView
@@ -162,19 +159,26 @@ const Portal = () => {
 
       <View className="flex-1 items-center justify-center p-6">
         <View className="w-full max-w-md bg-white rounded-2xl shadow-sm p-8">
-          {/* Only Delivery Partner Login form is rendered */}
-          <Text className="text-2xl font-bold text-center mb-8 text-indigo-700">
-            Delivery Partner Login
+          <TouchableOpacity 
+            className="mb-4 self-start"
+            onPress={() => navigation.navigate('Portal')}
+            disabled={loading}
+          >
+            <ChevronLeft size={24} color="#059669" />
+          </TouchableOpacity>
+
+          <Text className="text-2xl font-bold text-center mb-8 text-green-700">
+            Admin Login
           </Text>
 
           <InputField
             icon={<Mail />}
-            placeholder="Email"
+            placeholder="Admin Email"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             editable={!loading}
-            color="primary"
+            color="secondary"
           />
 
           <InputField
@@ -184,12 +188,12 @@ const Portal = () => {
             onChangeText={setPassword}
             secureTextEntry
             editable={!loading}
-            color="primary"
+            color="secondary"
           />
 
           <TouchableOpacity
-            className="py-3 rounded-xl bg-indigo-600 shadow-lg items-center justify-center"
-            onPress={handleDeliveryLogin}
+            className="py-3 rounded-xl bg-green-600 shadow-lg items-center justify-center"
+            onPress={handleAdminLogin}
             disabled={loading}
           >
             {loading ? (
@@ -197,17 +201,6 @@ const Portal = () => {
             ) : (
               <Text className="text-white text-lg font-bold">Login</Text>
             )}
-          </TouchableOpacity>
-
-          {/* This button now navigates directly to AdminPortal */}
-          <TouchableOpacity 
-            className="mt-6 self-center"
-            onPress={() => navigation.navigate('AdminPortal')} // Navigate to AdminPortal
-            disabled={loading}
-          >
-            <Text className="text-indigo-500 text-sm font-medium">
-              Go to Admin Portal
-            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -234,4 +227,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Portal;
+export default AdminPortal;

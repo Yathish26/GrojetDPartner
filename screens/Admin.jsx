@@ -2,8 +2,12 @@ import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Package, PlusCircle, ClipboardList, LogOut } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
+import { useNavigation } from '@react-navigation/native';
 
-export default function Admin({ navigation }) {
+export default function Admin() {
+
+  const navigation = useNavigation();
+
   useEffect(() => {
     const verifyToken = async () => {
       const token = await SecureStore.getItemAsync('admintoken');
