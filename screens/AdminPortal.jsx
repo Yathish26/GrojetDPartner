@@ -10,12 +10,14 @@ import {
   Modal,
   TouchableWithoutFeedback,
   StyleSheet,
-  Image
+  Image,
+  Alert
 } from 'react-native';
 import { User, Mail, Lock, XCircle, CheckCircle, ChevronLeft } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 import NetInfo from '@react-native-community/netinfo';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import API_CONFIG, { makeAuthenticatedRequest } from '../config/api.js';
 
 const CustomAlert = ({ visible, message, type, onClose }) => {
   const isSuccess = type === 'success';
@@ -84,6 +86,8 @@ const AdminPortal = () => {
   const [alertType, setAlertType] = useState('error');
   const [isConnected, setIsConnected] = useState(true);
 
+  const navigation = useNavigation();
+
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       setIsConnected(state.isConnected);
@@ -101,8 +105,6 @@ const AdminPortal = () => {
     setAlertVisible(false);
   };
 
-  const navigation = useNavigation();
-
   const handleAdminLogin = async () => {
     if (!email.trim() || !password.trim()) {
       showAlert('Please enter both email and password.', 'error');
@@ -117,12 +119,17 @@ const AdminPortal = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://192.168.1.35:5000/admin/login', {
+      const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ADMIN_LOGIN}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Platform': 'react-native',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ 
+          email, 
+          password,
+          platform: 'react-native'
+        }),
       });
 
       if (!response.ok) {
@@ -131,7 +138,12 @@ const AdminPortal = () => {
       }
 
       const data = await response.json();
-      await SecureStore.setItemAsync('admintoken', data.token);
+      
+      // Store admin info in secure storage
+      await SecureStore.setItemAsync('adminData', JSON.stringify(data.admin));
+      if (data.token) {
+        await SecureStore.setItemAsync('adminToken', data.token);
+      }
       
       showAlert('Admin login successful!', 'success');
       setTimeout(() => {
@@ -215,6 +227,10 @@ const AdminPortal = () => {
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
   shadow: {
     shadowColor: '#000',
     shadowOffset: {
@@ -224,6 +240,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '400',
   },
 });
 

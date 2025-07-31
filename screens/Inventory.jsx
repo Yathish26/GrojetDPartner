@@ -3,6 +3,7 @@ import { View, Text, ScrollView, ActivityIndicator, TextInput, TouchableOpacity,
 import * as SecureStore from 'expo-secure-store';
 import { Search, MoreVertical, Edit, Trash2, XCircle, CheckCircle, Plus } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
+import API_CONFIG, { makeAuthenticatedRequest } from '../config/api.js';
 
 // Custom Alert/Modal Component (reused from previous implementation)
 const CustomAlert = ({ visible, message, type, onClose }) => {
@@ -290,28 +291,22 @@ export default function Inventory() {
         setLoading(true);
         setError('');
         try {
-            const token = await SecureStore.getItemAsync('admintoken');
-            if (!token) {
-                showAlert('Authentication token missing. Please log in again.', 'error');
-                navigation.replace('Portal');
-                return;
-            }
+            const response = await makeAuthenticatedRequest(API_CONFIG.ENDPOINTS.INVENTORY_ALL);
 
-            const res = await fetch('http://192.168.1.35:5000/inventory/all', {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-
-            if (!res.ok) {
-                const errorData = await res.json();
+            if (!response.ok) {
+                const errorData = await response.json();
+                if (response.status === 401) {
+                    showAlert('Authentication failed. Please log in again.', 'error');
+                    navigation.replace('Portal');
+                    return;
+                }
                 throw new Error(errorData.message || 'Failed to fetch inventory.');
             }
 
-            const data = await res.json();
+            const data = await response.json();
 
             if (data.success) {
-                setInventory(data.inventory);
+                setInventory(data.data.items);
             } else {
                 setError(data.message || 'Failed to load inventory.');
                 showAlert(data.message || 'Failed to load inventory.', 'error');
@@ -342,26 +337,21 @@ export default function Inventory() {
         setError('');
 
         try {
-            const token = await SecureStore.getItemAsync('admintoken');
-            if (!token) {
-                showAlert('Authentication token missing. Please log in again.', 'error');
-                navigation.replace('Portal');
-                return;
-            }
-
-            const res = await fetch(`http://192.168.1.35:5000/inventory/delete/${itemIdToDelete}`, {
-                method: 'DELETE',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
+            const response = await makeAuthenticatedRequest(`${API_CONFIG.ENDPOINTS.INVENTORY_DELETE}/${itemIdToDelete}`, {
+                method: 'DELETE'
             });
 
-            if (!res.ok) {
-                const errorData = await res.json();
+            if (!response.ok) {
+                const errorData = await response.json();
+                if (response.status === 401) {
+                    showAlert('Authentication failed. Please log in again.', 'error');
+                    navigation.replace('Portal');
+                    return;
+                }
                 throw new Error(errorData.message || 'Failed to delete item.');
             }
 
-            const data = await res.json();
+            const data = await response.json();
             if (data.success) {
                 showAlert('Item deleted successfully!', 'success');
                 fetchInventory(); // Refresh the list
@@ -386,28 +376,22 @@ export default function Inventory() {
         setError('');
 
         try {
-            const token = await SecureStore.getItemAsync('admintoken');
-            if (!token) {
-                showAlert('Authentication token missing. Please log in again.', 'error');
-                navigation.replace('Portal');
-                return;
-            }
-
-            const res = await fetch(`http://192.168.1.35:5000/inventory/edit/${updatedItem._id}`, {
-                method: 'PUT', // Or PATCH, depending on your API
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify(updatedItem),
+            const response = await makeAuthenticatedRequest(`${API_CONFIG.ENDPOINTS.INVENTORY_EDIT}/${updatedItem._id}`, {
+                method: 'PUT',
+                body: JSON.stringify(updatedItem)
             });
 
-            if (!res.ok) {
-                const errorData = await res.json();
+            if (!response.ok) {
+                const errorData = await response.json();
+                if (response.status === 401) {
+                    showAlert('Authentication failed. Please log in again.', 'error');
+                    navigation.replace('Portal');
+                    return;
+                }
                 throw new Error(errorData.message || 'Failed to update item.');
             }
 
-            const data = await res.json();
+            const data = await response.json();
             if (data.success) {
                 showAlert('Item updated successfully!', 'success');
                 setEditModalVisible(false); // Close edit modal

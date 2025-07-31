@@ -10,25 +10,17 @@ import {
   Modal,
   TouchableWithoutFeedback,
   StyleSheet,
-  Image,
-  StatusBar,
   SafeAreaView,
-  Dimensions,
-  Animated,
-  Easing
+  StatusBar
 } from 'react-native';
-import { Package, Mail, Lock, XCircle, CheckCircle, Eye, EyeOff, AlertCircle } from 'lucide-react-native';
+import { User, Mail, Lock, XCircle, CheckCircle, ChevronLeft, Eye, EyeOff } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 import NetInfo from '@react-native-community/netinfo';
 import { useNavigation } from '@react-navigation/native';
 import API_CONFIG, { makeAuthenticatedRequest } from '../config/api.js';
-import { setToken, setDeliveryAgent } from '../utils/AuthManager.js';
-
-const { width, height } = Dimensions.get('window');
 
 const CustomAlert = ({ visible, message, type, onClose }) => {
   const isSuccess = type === 'success';
-  const isWarning = type === 'warning';
   
   let iconColor, bgColor, borderColor, textColor, buttonColor;
   
@@ -38,12 +30,6 @@ const CustomAlert = ({ visible, message, type, onClose }) => {
     borderColor = '#BBF7D0';
     textColor = '#065F46';
     buttonColor = '#059669';
-  } else if (isWarning) {
-    iconColor = '#D97706';
-    bgColor = '#FFFBEB';
-    borderColor = '#FDE68A';
-    textColor = '#92400E';
-    buttonColor = '#D97706';
   } else {
     iconColor = '#DC2626';
     bgColor = '#FEF2F2';
@@ -51,18 +37,6 @@ const CustomAlert = ({ visible, message, type, onClose }) => {
     textColor = '#991B1B';
     buttonColor = '#DC2626';
   }
-
-  const getIcon = () => {
-    if (isSuccess) return <CheckCircle size={24} color={iconColor} />;
-    if (isWarning) return <AlertCircle size={24} color={iconColor} />;
-    return <XCircle size={24} color={iconColor} />;
-  };
-
-  const getTitle = () => {
-    if (isSuccess) return 'Success';
-    if (isWarning) return 'Authentication Failed';
-    return 'Error';
-  };
 
   return (
     <Modal
@@ -76,11 +50,15 @@ const CustomAlert = ({ visible, message, type, onClose }) => {
           <View style={[styles.alertContainer, { backgroundColor: bgColor, borderColor }]}>
             <View style={styles.alertContent}>
               <View style={[styles.iconContainer, { backgroundColor: bgColor }]}>
-                {getIcon()}
+                {isSuccess ? (
+                  <CheckCircle size={24} color={iconColor} />
+                ) : (
+                  <XCircle size={24} color={iconColor} />
+                )}
               </View>
               <View style={styles.alertTextContainer}>
                 <Text style={[styles.alertTitle, { color: textColor }]}>
-                  {getTitle()}
+                  {isSuccess ? 'Success' : 'Error'}
                 </Text>
                 <Text style={styles.alertMessage}>
                   {message}
@@ -155,7 +133,8 @@ const InputField = ({ icon, placeholder, value, onChangeText, secureTextEntry, k
   );
 };
 
-const Portal = () => {
+const AdminPortal = () => {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -163,10 +142,10 @@ const Portal = () => {
   const [alertMessage, setAlertMessage] = useState('');
   const [alertType, setAlertType] = useState('error');
   const [isConnected, setIsConnected] = useState(true);
+  const [nameError, setNameError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const [attemptCount, setAttemptCount] = useState(0);
 
   const navigation = useNavigation();
 
@@ -176,6 +155,16 @@ const Portal = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  const validateName = (name) => {
+    if (!name.trim()) {
+      return 'Name is required';
+    }
+    if (name.length < 2) {
+      return 'Name must be at least 2 characters';
+    }
+    return '';
+  };
 
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -199,6 +188,7 @@ const Portal = () => {
   };
 
   const clearErrors = () => {
+    setNameError('');
     setEmailError('');
     setPasswordError('');
   };
@@ -211,6 +201,13 @@ const Portal = () => {
 
   const hideAlert = () => {
     setAlertVisible(false);
+  };
+
+  const handleNameChange = (text) => {
+    setName(text);
+    if (nameError) {
+      setNameError('');
+    }
   };
 
   const handleEmailChange = (text) => {
@@ -231,14 +228,16 @@ const Portal = () => {
     setIsPasswordVisible(!isPasswordVisible);
   };
 
-  const handleDeliveryLogin = async () => {
-    // Clear previous errors
+  const handleAdminLogin = async () => {
     clearErrors();
 
-    // Validate inputs
+    const nameValidationError = validateName(name);
     const emailValidationError = validateEmail(email);
     const passwordValidationError = validatePassword(password);
 
+    if (nameValidationError) {
+      setNameError(nameValidationError);
+    }
     if (emailValidationError) {
       setEmailError(emailValidationError);
     }
@@ -246,7 +245,7 @@ const Portal = () => {
       setPasswordError(passwordValidationError);
     }
 
-    if (emailValidationError || passwordValidationError) {
+    if (nameValidationError || emailValidationError || passwordValidationError) {
       return;
     }
 
@@ -256,18 +255,18 @@ const Portal = () => {
     }
 
     setLoading(true);
-    setAttemptCount(prev => prev + 1);
 
     try {
-      console.log('Attempting login to:', `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DELIVERY_LOGIN}`);
+      console.log('Attempting admin login to:', `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ADMIN_LOGIN}`);
       
-      const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DELIVERY_LOGIN}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ADMIN_LOGIN}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Platform': 'react-native',
         },
         body: JSON.stringify({ 
+          name: name.trim(),
           email: email.trim(), 
           password: password.trim(),
           platform: 'react-native'
@@ -288,21 +287,8 @@ const Portal = () => {
           errorData = { message: 'Server error occurred' };
         }
 
-        // Handle specific error cases
         if (response.status === 401) {
-          if (errorData.message?.toLowerCase().includes('password')) {
-            setPasswordError('Incorrect password');
-            showAlert('The password you entered is incorrect. Please check and try again.', 'warning');
-          } else if (errorData.message?.toLowerCase().includes('email') || errorData.message?.toLowerCase().includes('user')) {
-            setEmailError('Email not found');
-            showAlert('No account found with this email address.', 'warning');
-          } else {
-            showAlert('Invalid email or password. Please check your credentials and try again.', 'warning');
-          }
-        } else if (response.status === 403) {
-          showAlert('Your account has been disabled. Please contact support for assistance.', 'error');
-        } else if (response.status === 429) {
-          showAlert('Too many login attempts. Please wait a moment before trying again.', 'warning');
+          showAlert('Invalid credentials. Please check your information and try again.', 'error');
         } else if (response.status >= 500) {
           showAlert('Server is temporarily unavailable. Please try again in a few moments.', 'error');
         } else {
@@ -316,45 +302,35 @@ const Portal = () => {
       console.log('Login response:', data);
       
       if (!data.success) {
-        if (data.message?.toLowerCase().includes('password')) {
-          setPasswordError('Incorrect password');
-          showAlert('The password you entered is incorrect.', 'warning');
-        } else {
-          showAlert(data.message || 'Login failed. Please try again.', 'error');
-        }
+        showAlert(data.message || 'Login failed. Please try again.', 'error');
         return;
       }
 
-      if (!data.token || !data.agent) {
+      if (!data.token) {
         showAlert('Invalid response from server. Please try again.', 'error');
         return;
       }
 
-      // Store both token and agent info
-      await setToken(data.token);
-      await setDeliveryAgent(data.agent);
+      await SecureStore.setItemAsync('admintoken', data.token);
       
-      console.log('Login successful, token stored');
+      console.log('Admin login successful');
       
-      showAlert(`Welcome back, ${data.agent.name || 'Partner'}! You're now signed in.`, 'success');
+      showAlert(`Welcome ${name}! You're now signed in.`, 'success');
       
-      // Reset form
+      setName('');
       setEmail('');
       setPassword('');
-      setAttemptCount(0);
       
       setTimeout(() => {
         hideAlert();
-        navigation.navigate('Home');
+        navigation.navigate('Admin');
       }, 2000);
       
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Admin login error:', error);
       
       if (error.name === 'TypeError' && error.message.includes('Network request failed')) {
         showAlert('Unable to connect to server. Please check your internet connection and try again.', 'error');
-      } else if (error.name === 'SyntaxError') {
-        showAlert('Server returned invalid response. Please try again.', 'error');
       } else {
         showAlert(error.message || 'An unexpected error occurred. Please try again.', 'error');
       }
@@ -362,8 +338,6 @@ const Portal = () => {
       setLoading(false);
     }
   };
-
-  // Removed handleAdminLogin function as it's no longer handled here
 
   return (
     <SafeAreaView style={styles.container}>
@@ -381,27 +355,36 @@ const Portal = () => {
         />
 
         <View style={styles.contentContainer}>
-          {/* Logo and Header */}
+          {/* Header */}
           <View style={styles.headerContainer}>
+            <TouchableOpacity 
+              onPress={() => navigation.goBack()}
+              style={styles.backButton}
+              activeOpacity={0.7}
+            >
+              <ChevronLeft size={24} color="#4F46E5" />
+            </TouchableOpacity>
+            
             <View style={styles.logoContainer}>
-              <Package size={32} color="#FFFFFF" />
+              <User size={32} color="#FFFFFF" />
             </View>
-            <Text style={styles.mainTitle}>Grojet Delivery</Text>
-            <Text style={styles.subtitle}>Partner Portal</Text>
+            <Text style={styles.mainTitle}>Admin Portal</Text>
+            <Text style={styles.subtitle}>Management Access</Text>
           </View>
 
           {/* Login Card */}
           <View style={styles.loginCard}>
-            <Text style={styles.cardTitle}>Sign In</Text>
-            
-            {attemptCount > 2 && (
-              <View style={styles.securityNotice}>
-                <AlertCircle size={16} color="#D97706" />
-                <Text style={styles.securityText}>
-                  Multiple login attempts detected. Please check your credentials.
-                </Text>
-              </View>
-            )}
+            <Text style={styles.cardTitle}>Admin Sign In</Text>
+
+            <InputField
+              icon={<User />}
+              placeholder="Full Name"
+              value={name}
+              onChangeText={handleNameChange}
+              keyboardType="default"
+              editable={!loading}
+              error={nameError}
+            />
 
             <InputField
               icon={<Mail />}
@@ -431,7 +414,7 @@ const Portal = () => {
                 styles.loginButton,
                 loading && styles.loginButtonDisabled,
               ]}
-              onPress={handleDeliveryLogin}
+              onPress={handleAdminLogin}
               disabled={loading}
               activeOpacity={0.8}
             >
@@ -445,15 +428,15 @@ const Portal = () => {
               )}
             </TouchableOpacity>
 
-            {/* Admin Portal Link */}
+            {/* Back to Delivery Portal Link */}
             <TouchableOpacity 
-              style={styles.adminLinkContainer}
-              onPress={() => navigation.navigate('AdminPortal')}
+              style={styles.deliveryLinkContainer}
+              onPress={() => navigation.navigate('Portal')}
               disabled={loading}
               activeOpacity={0.7}
             >
-              <Text style={styles.adminLinkText}>
-                Admin Portal →
+              <Text style={styles.deliveryLinkText}>
+                ← Back to Delivery Portal
               </Text>
             </TouchableOpacity>
           </View>
@@ -461,7 +444,7 @@ const Portal = () => {
           {/* Footer */}
           <View style={styles.footerContainer}>
             <Text style={styles.footerText}>
-              Powered by Grojet
+              Grojet Admin Dashboard
             </Text>
           </View>
         </View>
@@ -487,14 +470,21 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: 20,
-    paddingTop: 40,
+    paddingTop: 20,
   },
   headerContainer: {
     alignItems: 'center',
     marginBottom: 40,
+    position: 'relative',
+  },
+  backButton: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
   },
   logoContainer: {
     width: 60,
@@ -504,6 +494,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
+    marginTop: 20,
   },
   mainTitle: {
     fontSize: 24,
@@ -524,6 +515,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    alignSelf: 'center',
   },
   cardTitle: {
     fontSize: 20,
@@ -531,23 +523,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
     color: '#1F2937',
-  },
-  securityNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-  },
-  securityText: {
-    fontSize: 13,
-    color: '#92400E',
-    marginLeft: 8,
-    flex: 1,
-    fontWeight: '400',
   },
   inputFieldContainer: {
     marginBottom: 16,
@@ -619,11 +594,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  adminLinkContainer: {
+  deliveryLinkContainer: {
     paddingVertical: 12,
     alignItems: 'center',
   },
-  adminLinkText: {
+  deliveryLinkText: {
     color: '#4F46E5',
     fontSize: 15,
     fontWeight: '400',
@@ -706,4 +681,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Portal;
+export default AdminPortal;

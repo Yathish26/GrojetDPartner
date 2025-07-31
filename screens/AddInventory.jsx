@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { useNavigation } from '@react-navigation/native';
+import API_CONFIG, { makeAuthenticatedRequest } from '../config/api.js';
 
 export default function AddInventory() {
     const [itemName, setItemName] = useState('');
@@ -9,12 +10,12 @@ export default function AddInventory() {
     const [price, setPrice] = useState('');
     const [category, setCategory] = useState('');
     const [loading, setLoading] = useState(false);
+    const navigation = useNavigation();
 
     useEffect(() => {
         const verifyToken = async () => {
-            const token = await SecureStore.getItemAsync('admintoken');
-            if (!token) {
-                await SecureStore.deleteItemAsync('admintoken');
+            const deliveryAgent = await SecureStore.getItemAsync('deliveryAgent');
+            if (!deliveryAgent) {
                 navigation.replace('Portal');
             }
         };
@@ -25,14 +26,13 @@ export default function AddInventory() {
 
     useEffect(() => {
         const verifyToken = async () => {
-            const token = await SecureStore.getItemAsync('admintoken');
-            if (!token) {
-                await SecureStore.deleteItemAsync('admintoken');
-                navigate.replace('Portal');
+            const deliveryAgent = await SecureStore.getItemAsync('deliveryAgent');
+            if (!deliveryAgent) {
+                navigation.replace('Portal');
             }
         };
         verifyToken();
-    }, []);
+    }, [navigation]);
 
     const handleAddItem = async () => {
         if (!itemName || !stockquantity || !price || !category) {
@@ -42,32 +42,33 @@ export default function AddInventory() {
 
         try {
             setLoading(true);
-            const token = await SecureStore.getItemAsync('admintoken');
 
-            const response = await fetch('http://192.168.1.35:5000/inventory/add', {
+            const response = await makeAuthenticatedRequest(API_CONFIG.ENDPOINTS.INVENTORY_ADD, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                },
                 body: JSON.stringify({
-                    itemName,
-                    stockquantity: Number(stockquantity),
+                    name: itemName,
+                    quantity: Number(stockquantity),
                     price: Number(price),
                     category,
-                }),
+                    unit: 'pieces' // Default unit
+                })
             });
 
             const data = await response.json();
 
             if (response.ok && data.success) {
                 Alert.alert('Success', 'Item added successfully!');
-                navigate.navigate('Inventory');
+                navigation.navigate('Inventory');
                 setItemName('');
                 setStockQuantity('');
                 setPrice('');
                 setCategory('');
             } else {
+                if (response.status === 401) {
+                    Alert.alert('Authentication Error', 'Please log in again.');
+                    navigation.replace('Portal');
+                    return;
+                }
                 Alert.alert('Error', data.message || 'Failed to add item.');
             }
         } catch (err) {
