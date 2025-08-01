@@ -9,90 +9,64 @@ import {
   Platform,
   Modal,
   TouchableWithoutFeedback,
-  StyleSheet,
-  Image,
   StatusBar,
   SafeAreaView,
-  Dimensions,
-  Animated,
-  Easing
+  Dimensions
 } from 'react-native';
-import { Package, Mail, Lock, XCircle, CheckCircle, Eye, EyeOff, AlertCircle } from 'lucide-react-native';
+import { Package, Mail, Lock, XCircle, Eye, EyeOff, AlertCircle, CircleCheck } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 import NetInfo from '@react-native-community/netinfo';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import API_CONFIG, { makeAuthenticatedRequest } from '../config/api.js';
-import { setToken, setDeliveryAgent } from '../utils/AuthManager.js';
+import { setToken, setDeliveryAgent, isAuthenticated } from '../utils/AuthManager.js';
 
 const { width, height } = Dimensions.get('window');
 
-const CustomAlert = ({ visible, message, type, onClose }) => {
-  const isSuccess = type === 'success';
-  const isWarning = type === 'warning';
-  
-  let iconColor, bgColor, borderColor, textColor, buttonColor;
-  
-  if (isSuccess) {
-    iconColor = '#059669';
-    bgColor = '#F0FDF4';
-    borderColor = '#BBF7D0';
-    textColor = '#065F46';
-    buttonColor = '#059669';
-  } else if (isWarning) {
-    iconColor = '#D97706';
-    bgColor = '#FFFBEB';
-    borderColor = '#FDE68A';
-    textColor = '#92400E';
-    buttonColor = '#D97706';
-  } else {
-    iconColor = '#DC2626';
-    bgColor = '#FEF2F2';
-    borderColor = '#FECACA';
-    textColor = '#991B1B';
-    buttonColor = '#DC2626';
+const CustomAlert = ({ visible, message, type = 'error', onClose }) => {
+  let icon, bg, border, text, button;
+  switch (type) {
+    case 'success':
+      icon = <CircleCheck size={28} color="#16a34a" />;
+      bg = 'bg-green-50';
+      border = 'border-green-200';
+      text = 'text-green-800';
+      button = 'bg-green-600';
+      break;
+    case 'warning':
+      icon = <AlertCircle size={28} color="#eab308" />;
+      bg = 'bg-yellow-50';
+      border = 'border-yellow-200';
+      text = 'text-yellow-800';
+      button = 'bg-yellow-600';
+      break;
+    default:
+      icon = <XCircle size={28} color="#dc2626" />;
+      bg = 'bg-red-50';
+      border = 'border-red-200';
+      text = 'text-red-800';
+      button = 'bg-red-600';
   }
 
-  const getIcon = () => {
-    if (isSuccess) return <CheckCircle size={24} color={iconColor} />;
-    if (isWarning) return <AlertCircle size={24} color={iconColor} />;
-    return <XCircle size={24} color={iconColor} />;
-  };
-
-  const getTitle = () => {
-    if (isSuccess) return 'Success';
-    if (isWarning) return 'Authentication Failed';
-    return 'Error';
-  };
+  const title = type === 'success'
+    ? 'Success'
+    : type === 'warning'
+    ? 'Warning'
+    : 'Error';
 
   return (
-    <Modal
-      transparent
-      animationType="fade"
-      visible={visible}
-      onRequestClose={onClose}
-    >
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.alertContainer, { backgroundColor: bgColor, borderColor }]}>
-            <View style={styles.alertContent}>
-              <View style={[styles.iconContainer, { backgroundColor: bgColor }]}>
-                {getIcon()}
-              </View>
-              <View style={styles.alertTextContainer}>
-                <Text style={[styles.alertTitle, { color: textColor }]}>
-                  {getTitle()}
-                </Text>
-                <Text style={styles.alertMessage}>
-                  {message}
-                </Text>
-              </View>
-            </View>
+        <View className="flex-1 justify-center items-center bg-black/40 px-6">
+          <View className={`w-full max-w-xs rounded-xl p-6 border ${bg} ${border}`}>
+            <View className="items-center mb-3">{icon}</View>
+            <Text className={`text-lg font-semibold text-center mb-1 ${text}`}>{title}</Text>
+            <Text className="text-base text-gray-600 text-center mb-4">{message}</Text>
             <TouchableOpacity
               onPress={onClose}
-              style={[styles.alertButton, { backgroundColor: buttonColor }]}
-              activeOpacity={0.8}
+              className={`py-2 rounded-lg items-center ${button} mt-1`}
+              activeOpacity={0.9}
             >
-              <Text style={styles.alertButtonText}>OK</Text>
+              <Text className="text-white font-medium text-base">OK</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -101,25 +75,44 @@ const CustomAlert = ({ visible, message, type, onClose }) => {
   );
 };
 
-const InputField = ({ icon, placeholder, value, onChangeText, secureTextEntry, keyboardType, editable, error, showPasswordToggle, onTogglePassword, isPasswordVisible }) => {
+const InputField = ({
+  icon,
+  placeholder,
+  value,
+  onChangeText,
+  secureTextEntry,
+  keyboardType,
+  editable,
+  error,
+  showPasswordToggle,
+  onTogglePassword,
+  isPasswordVisible,
+}) => {
   const [isFocused, setIsFocused] = useState(false);
-  
+
   const handleFocus = () => setIsFocused(true);
   const handleBlur = () => setIsFocused(false);
 
+  let border = 'border-gray-300';
+  let background = 'bg-gray-50';
+  if (isFocused) {
+    border = 'border-indigo-600';
+    background = 'bg-white';
+  }
+  if (error) {
+    border = 'border-red-600';
+    background = 'bg-red-50';
+  }
+
   return (
-    <View style={styles.inputFieldContainer}>
-      <View style={[
-        styles.inputContainer,
-        isFocused && styles.inputFocused,
-        error && styles.inputError
-      ]}>
-        {React.cloneElement(icon, { 
-          size: 20, 
-          color: error ? '#DC2626' : isFocused ? '#4F46E5' : '#6B7280' 
+    <View className="mb-4">
+      <View className={`flex-row items-center rounded-lg px-3 py-3 border ${border} ${background}`}>
+        {React.cloneElement(icon, {
+          size: 20,
+          color: error ? '#DC2626' : isFocused ? '#4F46E5' : '#6B7280',
         })}
         <TextInput
-          style={styles.textInput}
+          className="flex-1 ml-3 text-base text-gray-900 font-normal"
           placeholder={placeholder}
           placeholderTextColor="#9CA3AF"
           keyboardType={keyboardType}
@@ -134,7 +127,7 @@ const InputField = ({ icon, placeholder, value, onChangeText, secureTextEntry, k
         {showPasswordToggle && (
           <TouchableOpacity
             onPress={onTogglePassword}
-            style={styles.passwordToggle}
+            className="p-1"
             activeOpacity={0.7}
           >
             {isPasswordVisible ? (
@@ -146,9 +139,9 @@ const InputField = ({ icon, placeholder, value, onChangeText, secureTextEntry, k
         )}
       </View>
       {error && (
-        <View style={styles.errorContainer}>
+        <View className="flex-row items-center mt-1 ml-1">
           <XCircle size={14} color="#DC2626" />
-          <Text style={styles.errorText}>{error}</Text>
+          <Text className="text-sm text-red-600 ml-1 font-normal">{error}</Text>
         </View>
       )}
     </View>
@@ -176,6 +169,38 @@ const Portal = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const authenticated = await isAuthenticated();
+        if (authenticated) {
+          navigation.replace('Home');
+        }
+      } catch (error) {
+        console.error('Error checking authentication status:', error);
+      }
+    };
+
+    checkAuthStatus();
+  }, [navigation]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const checkAuthOnFocus = async () => {
+        try {
+          const authenticated = await isAuthenticated();
+          if (authenticated) {
+            navigation.replace('Home');
+          }
+        } catch (error) {
+          console.error('Error checking authentication on focus:', error);
+        }
+      };
+
+      checkAuthOnFocus();
+    }, [navigation])
+  );
 
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -232,23 +257,15 @@ const Portal = () => {
   };
 
   const handleDeliveryLogin = async () => {
-    // Clear previous errors
     clearErrors();
 
-    // Validate inputs
     const emailValidationError = validateEmail(email);
     const passwordValidationError = validatePassword(password);
 
-    if (emailValidationError) {
-      setEmailError(emailValidationError);
-    }
-    if (passwordValidationError) {
-      setPasswordError(passwordValidationError);
-    }
+    if (emailValidationError) setEmailError(emailValidationError);
+    if (passwordValidationError) setPasswordError(passwordValidationError);
 
-    if (emailValidationError || passwordValidationError) {
-      return;
-    }
+    if (emailValidationError || passwordValidationError) return;
 
     if (!isConnected) {
       showAlert('No internet connection detected. Please check your network and try again.', 'error');
@@ -259,28 +276,21 @@ const Portal = () => {
     setAttemptCount(prev => prev + 1);
 
     try {
-      console.log('Attempting login to:', `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DELIVERY_LOGIN}`);
-      
       const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DELIVERY_LOGIN}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Platform': 'react-native',
         },
-        body: JSON.stringify({ 
-          email: email.trim(), 
+        body: JSON.stringify({
+          email: email.trim(),
           password: password.trim(),
           platform: 'react-native'
         }),
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.log('Error response:', errorText);
-        
         let errorData;
         try {
           errorData = JSON.parse(errorText);
@@ -288,7 +298,6 @@ const Portal = () => {
           errorData = { message: 'Server error occurred' };
         }
 
-        // Handle specific error cases
         if (response.status === 401) {
           if (errorData.message?.toLowerCase().includes('password')) {
             setPasswordError('Incorrect password');
@@ -308,13 +317,11 @@ const Portal = () => {
         } else {
           showAlert(errorData.message || `Authentication failed (${response.status})`, 'error');
         }
-        
         return;
       }
 
       const data = await response.json();
-      console.log('Login response:', data);
-      
+
       if (!data.success) {
         if (data.message?.toLowerCase().includes('password')) {
           setPasswordError('Incorrect password');
@@ -330,27 +337,21 @@ const Portal = () => {
         return;
       }
 
-      // Store both token and agent info
       await setToken(data.token);
       await setDeliveryAgent(data.agent);
-      
-      console.log('Login successful, token stored');
-      
+
       showAlert(`Welcome back, ${data.agent.name || 'Partner'}! You're now signed in.`, 'success');
-      
-      // Reset form
+
       setEmail('');
       setPassword('');
       setAttemptCount(0);
-      
+
       setTimeout(() => {
         hideAlert();
         navigation.navigate('Home');
       }, 2000);
-      
+
     } catch (error) {
-      console.error('Login error:', error);
-      
       if (error.name === 'TypeError' && error.message.includes('Network request failed')) {
         showAlert('Unable to connect to server. Please check your internet connection and try again.', 'error');
       } else if (error.name === 'SyntaxError') {
@@ -363,15 +364,12 @@ const Portal = () => {
     }
   };
 
-  // Removed handleAdminLogin function as it's no longer handled here
-
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView className="flex-1 bg-white">
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
+        className="flex-1"
       >
         <CustomAlert
           visible={alertVisible}
@@ -380,24 +378,24 @@ const Portal = () => {
           onClose={hideAlert}
         />
 
-        <View style={styles.contentContainer}>
+        <View className="flex-1 items-center justify-center px-5 pt-10">
           {/* Logo and Header */}
-          <View style={styles.headerContainer}>
-            <View style={styles.logoContainer}>
+          <View className="items-center mb-10">
+            <View className="w-15 h-15 bg-indigo-600 p-4 rounded-xl items-center justify-center mb-4">
               <Package size={32} color="#FFFFFF" />
             </View>
-            <Text style={styles.mainTitle}>Grojet Delivery</Text>
-            <Text style={styles.subtitle}>Partner Portal</Text>
+            <Text className="text-2xl font-semibold text-gray-900 mb-1">Grojet Delivery</Text>
+            <Text className="text-base text-gray-500 font-normal">Partner Portal</Text>
           </View>
 
           {/* Login Card */}
-          <View style={styles.loginCard}>
-            <Text style={styles.cardTitle}>Sign In</Text>
-            
+          <View className="w-full max-w-md bg-white rounded-xl p-6 border border-gray-200">
+            <Text className="text-xl font-medium text-center mb-6 text-gray-900">Sign In</Text>
+
             {attemptCount > 2 && (
-              <View style={styles.securityNotice}>
+              <View className="flex-row items-center bg-yellow-100 rounded-lg p-3 mb-4 border border-yellow-400">
                 <AlertCircle size={16} color="#D97706" />
-                <Text style={styles.securityText}>
+                <Text className="text-xs text-yellow-900 ml-2 flex-1 font-normal">
                   Multiple login attempts detected. Please check your credentials.
                 </Text>
               </View>
@@ -427,40 +425,25 @@ const Portal = () => {
             />
 
             <TouchableOpacity
-              style={[
-                styles.loginButton,
-                loading && styles.loginButtonDisabled,
-              ]}
+              className={`mt-2 mb-4 bg-indigo-600 py-3 rounded-lg items-center justify-center ${loading ? 'bg-gray-400' : ''}`}
               onPress={handleDeliveryLogin}
               disabled={loading}
               activeOpacity={0.8}
             >
               {loading ? (
-                <View style={styles.loadingContainer}>
+                <View className="flex-row items-center">
                   <ActivityIndicator color="#FFFFFF" size="small" />
-                  <Text style={styles.loadingText}>Signing In...</Text>
+                  <Text className="text-white text-base font-medium ml-2">Signing In...</Text>
                 </View>
               ) : (
-                <Text style={styles.loginButtonText}>Sign In</Text>
+                <Text className="text-white text-base font-medium">Sign In</Text>
               )}
-            </TouchableOpacity>
-
-            {/* Admin Portal Link */}
-            <TouchableOpacity 
-              style={styles.adminLinkContainer}
-              onPress={() => navigation.navigate('AdminPortal')}
-              disabled={loading}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.adminLinkText}>
-                Admin Portal →
-              </Text>
             </TouchableOpacity>
           </View>
 
           {/* Footer */}
-          <View style={styles.footerContainer}>
-            <Text style={styles.footerText}>
+          <View className="mt-8 items-center">
+            <Text className="text-gray-400 text-sm text-center font-normal">
               Powered by Grojet
             </Text>
           </View>
@@ -468,242 +451,13 @@ const Portal = () => {
 
         {/* Network Status */}
         {!isConnected && (
-          <View style={styles.networkBanner}>
-            <Text style={styles.networkBannerText}>No Internet Connection</Text>
+          <View className="absolute bottom-0 w-full bg-red-600 py-3 items-center justify-center">
+            <Text className="text-white font-medium text-sm">No Internet Connection</Text>
           </View>
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  contentContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 40,
-  },
-  headerContainer: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  logoContainer: {
-    width: 60,
-    height: 60,
-    backgroundColor: '#4F46E5',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  mainTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    fontWeight: '400',
-  },
-  loginCard: {
-    width: '100%',
-    maxWidth: 380,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginBottom: 24,
-    color: '#1F2937',
-  },
-  securityNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-  },
-  securityText: {
-    fontSize: 13,
-    color: '#92400E',
-    marginLeft: 8,
-    flex: 1,
-    fontWeight: '400',
-  },
-  inputFieldContainer: {
-    marginBottom: 16,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-  },
-  inputFocused: {
-    borderColor: '#4F46E5',
-    backgroundColor: '#FFFFFF',
-  },
-  inputError: {
-    borderColor: '#DC2626',
-    backgroundColor: '#FEF2F2',
-  },
-  textInput: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
-    color: '#1F2937',
-    fontWeight: '400',
-  },
-  passwordToggle: {
-    padding: 4,
-  },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-    marginLeft: 4,
-  },
-  errorText: {
-    fontSize: 14,
-    color: '#DC2626',
-    marginLeft: 6,
-    fontWeight: '400',
-  },
-  loginButton: {
-    backgroundColor: '#4F46E5',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    marginTop: 8,
-  },
-  loginButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
-  },
-  loginButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  adminLinkContainer: {
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  adminLinkText: {
-    color: '#4F46E5',
-    fontSize: 15,
-    fontWeight: '400',
-  },
-  footerContainer: {
-    marginTop: 32,
-    alignItems: 'center',
-  },
-  footerText: {
-    color: '#9CA3AF',
-    fontSize: 14,
-    textAlign: 'center',
-    fontWeight: '400',
-  },
-  networkBanner: {
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-    backgroundColor: '#DC2626',
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  networkBannerText: {
-    color: '#FFFFFF',
-    fontWeight: '500',
-    fontSize: 14,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: 20,
-  },
-  alertContainer: {
-    width: '100%',
-    maxWidth: 320,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 2,
-  },
-  alertContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  alertTextContainer: {
-    flex: 1,
-  },
-  alertTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  alertMessage: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-    fontWeight: '400',
-  },
-  alertButton: {
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  alertButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-});
 
 export default Portal;
